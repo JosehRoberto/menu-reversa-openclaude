@@ -1,211 +1,202 @@
 # Menu de Comandos Reversa para OpenClaude
 
-Bridge que expõe os **skills do framework Reversa** (instalados em `.agents/skills/`
-via `npx reversa install`) como **comandos slash** nativos do **OpenClaude**
-(`@gitlawb/openclaude`) — por exemplo `/reversa`, `/reversa-new`, `/reversa-forward`.
+Bridge que expõe os **skills do framework Reversa** (instalados em `.agents/skills/` via `npx reversa install`) como **comandos slash** nativos do **OpenClaude** (`@gitlawb/openclaude`) — por exemplo `/reversa`, `/reversa-new`, `/reversa-forward`.
 
-> O Reversa é compatível com Agent Skills, mas o OpenClaude só descobre skills em
-> diretórios específicos (`.openclaude/skills/` no projeto, e `~/.openclaude/skills/`
-> no escopo do usuário). Como o Reversa instala em `.agents/skills/`, esses skills
-> não aparecem por padrão. Este repo entrega um script bash que cria **symlinks**
-> de `.openclaude/skills/<name>` para `.agents/skills/<name>`, fazendo com que o
-> OpenClaude carregue cada `SKILL.md` como um comando slash.
+A partir da versão 1, a lógica deixou de ser um script shell embutido no README e passou a ser um **núcleo Python único e portátil** (`menu-reversa-openclaude.py`), com wrappers finos por sistema operacional. Isso torna a execução **determinística** em Linux, macOS e Windows.
+
+> O Reversa é compatível com Agent Skills, mas o OpenClaude só descobre skills em diretórios específicos (`.openclaude/skills/` no projeto, e `~/.openclaude/skills/` no escopo do usuário). Como o Reversa instala em `.agents/skills/`, esses skills não aparecem por padrão. Este repositório entrega um script que cria **symlinks** (ou cópias, com `--copy`) de `.openclaude/skills/<name>` para `.agents/skills/<name>`, fazendo com que o OpenClaude carregue cada `SKILL.md` como um comando slash.
 
 ## Por que funciona
 
 O binário do OpenClaude (validado em `@gitlawb/openclaude@0.26.0`):
 
-1. chama `loadSkillsFromSkillsDir(<projeto>/.openclaude/skills, "projectSettings")`
-   e `loadSkillsFromSkillsDir(~/.openclaude/skills, "userSettings")`;
-2. em `findSkillMarkdownFiles`, segue **explicitamente symlinks de diretório**:
-   `if(entry.isSymbolicLink()) try { if((await fs.stat(entryPath)).isDirectory()) childDirs.push(entryPath) }`;
+1. chama `loadSkillsFromSkillsDir(<projeto>/.openclaude/skills, "projectSettings")` e `loadSkillsFromSkillsDir(~/.openclaude/skills, "userSettings")`;
+2. em `findSkillMarkdownFiles`, segue **explicitamente symlinks de diretório**: `if(entry.isSymbolicLink()) try { if((await fs.stat(entryPath)).isDirectory()) childDirs.push(entryPath) }`;
 3. carrega qualquer arquivo `SKILL.md` (case-insensitive) dentro da pasta;
-4. no frontmatter, `user-invocable` **defaults to `true`** quando omitido
-   (`userInvocable: definition.userInvocable ?? !0`) — então skills sem
-   `user-invocable` no frontmatter (como os do Reversa) ainda viram slash command;
-5. o nome do comando é derivado da pasta-mãe via `getSkillCommandName(filePath, basePath)`,
-   então `.openclaude/skills/reversa/SKILL.md` expõe `/reversa`.
+4. no frontmatter, `user-invocable` **defaults to `true`** quando omitido (`userInvocable: definition.userInvocable ?? !0`) — então skills sem `user-invocable` no frontmatter (como os do Reversa) ainda viram slash command;
+5. o nome do comando é derivado da pasta-mãe via `getSkillCommandName(filePath, basePath)`, então `.openclaude/skills/reversa/SKILL.md` expõe `/reversa`.
 
-Como os `SKILL.md` do Reversa já têm `name` e `description` no frontmatter,
-**não é necessário gerar arquivos `.md` sintéticos** (ao contrário do bridge do
-opencode). Basta apresentar a pasta original em `.openclaude/skills/`.
+Como os `SKILL.md` do Reversa já têm `name` e `description` no frontmatter, **não é necessário gerar arquivos `.md` sintéticos** (ao contrário do bridge do OpenCode). Basta apresentar a pasta original em `.openclaude/skills/`.
 
 ## Pré-requisitos
 
-- `npx reversa install` já executado no projeto (de modo que `.agents/skills/reversa*/`
-  exista).
-- OpenClaude instalado (`npm i -g @gitlawb/openclaude`).
-- Bash (Linux/macOS). No Windows, rode via Git Bash ou WSL — o agente traduz os
-  comandos para PowerShell/zsh quando necessário.
+- **Python 3** (não requer PyYAML).
+- **Reversa instalado** no projeto (`npx reversa install`), de modo que `.agents/skills/reversa*/` exista.
+- **OpenClaude** instalado (`npm i -g @gitlawb/openclaude`).
+- **Bash** (Linux/macOS) ou **PowerShell** (Windows 10/11).
+- **git** (para o fluxo via prompt ou clonagem).
 
-## Instalação (primeira execução)
+> **Windows:** a criação de symlinks exige *Developer Mode* ou privilégios de administrador. Sem isso, use `--copy`.
 
-No projeto onde o Reversa já está instalado, abra o OpenClaude e cole:
+## Instalação
 
-> Execute o procedimento descrito em https://github.com/JosehRoberto/menu-reversa-openclaude para instalar os comandos do Reversa neste projeto.
+### Opção A — via prompt (recomendada)
 
-O agente vai buscar este README e executar o **script de instalação segura** abaixo.
+No projeto onde o Reversa já está instalado, abra o agente e cole:
 
-### Script de instalação segura (1ª execução)
+```text
+Instale os comandos Reversa no OpenClaude usando a versão fixada v1.0.0 do repositório https://github.com/JosehRoberto/menu-reversa-openclaude.
+
+Procedimento:
+1. Clone a versão fixada em uma pasta temporária do sistema:
+   git clone --branch v1.0.0 --depth 1 https://github.com/JosehRoberto/menu-reversa-openclaude.git
+2. Garanta Python 3 no ambiente atual.
+3. Na raiz do meu projeto, execute o instalador não interativo:
+   - Linux/macOS: bash <pasta-clonada>/bin/install.sh --yes
+   - Windows: powershell -ExecutionPolicy Bypass -File <pasta-clonada>\bin\install.ps1 --yes
+   (No Windows sem privilégio de symlink, acrescente --copy.)
+4. Crie backup de qualquer link/arquivo existente antes de sobrescrever.
+5. Ao final, informe o resumo (criados, atualizados, ignorados).
+```
+
+### Opção B — execução manual
+
+Clone a versão fixada e execute o wrapper **dentro da raiz do projeto onde o Reversa está instalado**:
 
 ```bash
-#!/usr/bin/env bash
-set -euo pipefail
-
-ROOT="$(pwd)"
-AGENTS_SKILLS="$ROOT/.agents/skills"
-OC_SKILLS="$ROOT/.openclaude/skills"
-
-if [[ ! -d "$AGENTS_SKILLS" ]]; then
-  echo "Aviso: $AGENTS_SKILLS não existe. Rode 'npx reversa install' primeiro."
-  exit 1
-fi
-
-# Cria .openclaude/skills se não existir
-mkdir -p "$OC_SKILLS"
-
-# Backup se já houver links lá
-if [[ -n "$(ls -A "$OC_SKILLS" 2>/dev/null)" ]]; then
-  ts="$(date +%Y%m%d-%H%M%S)"
-  backup="$ROOT/.openclaude/skills.bak.$ts"
-  echo "Backup existente em $OC_SKILLS -> $backup"
-  cp -a "$OC_SKILLS" "$backup"
-fi
-
-count=0
-for src in "$AGENTS_SKILLS"/reversa*/; do
-  [[ -d "$src" ]] || continue
-  name="$(basename "$src")"
-  target="../../.agents/skills/$name"
-  link="$OC_SKILLS/$name"
-
-  # Pula se já for um symlink válido apontando para o alvo certo
-  if [[ -L "$link" && "$(readlink "$link")" == "$target" ]]; then
-    echo "OK (existente): $name"
-    continue
-  fi
-
-  # Se já existir (link quebrado, dir real, arquivo), pede confirmação
-  if [[ -e "$link" || -L "$link" ]]; then
-    echo "Conflito em $name:"
-    ls -la "$link" || true
-    read -r -p "Sobrescrever $link com symlink para $target? [y/N] " ok
-    [[ "$ok" =~ ^[yY]$ ]] || { echo "Pulando $name"; continue; }
-    rm -rf "$link"
-  fi
-
-  ln -s "$target" "$link"
-  echo "Link criado: $link -> $target"
-  count=$((count + 1))
-done
-
-echo "Concluído. $count symlink(s) criados. Reinicie o OpenClaude no projeto para ver /reversa*."
+git clone --branch v1.0.0 --depth 1 https://github.com/JosehRoberto/menu-reversa-openclaude.git /tmp/menu-reversa-openclaude
 ```
+
+**Linux / macOS:**
+
+```bash
+bash /tmp/menu-reversa-openclaude/bin/install.sh --yes
+```
+
+**Windows 10/11 (PowerShell):**
+
+```powershell
+powershell -ExecutionPolicy Bypass -File C:\caminho\menu-reversa-openclaude\bin\install.ps1 --yes
+```
+
+Reinicie o OpenClaude no projeto para ver `/reversa*`.
+
+> O núcleo cria `.openclaude/skills/`, faz **backup** da pasta se já houver conteúdo e cria um symlink por skill `reversa*` (pulando links válidos e pedindo confirmação em conflitos).
 
 ## Sincronização (após `npx reversa update`)
 
-Quando o Reversa adiciona/remove skills, rode o prompt:
+Quando o Reversa adiciona/remove skills, sincronize (cria links novos, recalibra existentes e remove **órfãos** com confirmação):
 
-> Sincronize os comandos do Reversa com https://github.com/JosehRoberto/menu-reversa-openclaude
-
-O agente executa o script de sincronização: cria symlinks novos, recalibra
-existentes, e detecta **órfãos** (links em `.openclaude/skills/` cuja fonte em
-`.agents/skills/` sumiu) pedindo confirmação antes de remover.
-
-### Script de sincronização
+**Linux / macOS:**
 
 ```bash
-#!/usr/bin/env bash
-set -euo pipefail
-
-ROOT="$(pwd)"
-AGENTS_SKILLS="$ROOT/.agents/skills"
-OC_SKILLS="$ROOT/.openclaude/skills"
-
-mkdir -p "$OC_SKILLS"
-
-created=0; updated=0; removed=0
-
-# 1) Cria/atualiza symlinks para cada skill atual
-for src in "$AGENTS_SKILLS"/reversa*/; do
-  [[ -d "$src" ]] || continue
-  name="$(basename "$src")"
-  target="../../.agents/skills/$name"
-  link="$OC_SKILLS/$name"
-
-  if [[ -L "$link" && "$(readlink "$link")" == "$target" ]]; then
-    continue
-  fi
-
-  if [[ -e "$link" || -L "$link" ]]; then
-    echo "Atualizar: $name (era $(readlink "$link" 2>/dev/null || echo 'não-symlink'))"
-    read -r -p "Recriar $link -> $target? [y/N] " ok
-    [[ "$ok" =~ ^[yY]$ ]] || { echo "Pulado $name"; continue; }
-    rm -rf "$link"
-    ln -s "$target" "$link"
-    updated=$((updated + 1))
-  else
-    ln -s "$target" "$link"
-    echo "Criado: $name"
-    created=$((created + 1))
-  fi
-done
-
-# 2) Detecta órfãos: symlinks em .openclaude/skills cuja fonte sumiu
-if [[ -n "$(ls -A "$OC_SKILLS" 2>/dev/null)" ]]; then
-  for link in "$OC_SKILLS"/*; do
-    [[ -L "$link" ]] || continue
-    name="$(basename "$link")"
-    if [[ ! -d "$AGENTS_SKILLS/$name" ]]; then
-      echo "Órfão: $name (fonte .agents/skills/$name não existe mais)"
-      read -r -p "Remover $link? [y/N] " ok
-      if [[ "$ok" =~ ^[yY]$ ]]; then
-        rm -f "$link"
-        removed=$((removed + 1))
-      fi
-    fi
-  done
-fi
-
-echo "Sync concluído: $created criado(s), $updated atualizado(s), $removed órfão(s) removido(s)."
+bash /tmp/menu-reversa-openclaude/bin/sync.sh --yes
 ```
+
+**Windows 10/11 (PowerShell):**
+
+```powershell
+powershell -ExecutionPolicy Bypass -File C:\caminho\menu-reversa-openclaude\bin\sync.ps1 --yes
+```
+
+Ou use o núcleo direto, em qualquer sistema:
+
+```bash
+python3 menu-reversa-openclaude.py install --yes
+python3 menu-reversa-openclaude.py sync --yes
+```
+
+## Arquitetura
+
+| Arquivo | Papel |
+|---|---|
+| `menu-reversa-openclaude.py` | Núcleo único, portátil. Contém toda a lógica. Subcomandos `install` e `sync` |
+| `bin/install.sh`, `bin/sync.sh` | Wrappers finos para Linux/macOS (bash 3.2+) |
+| `bin/install.ps1`, `bin/sync.ps1` | Wrappers finos para Windows (PowerShell) |
+
+Os wrappers apenas detectam o Python 3 (`python3` → `python` → `py -3`) e chamam o núcleo. Toda a lógica vive em `menu-reversa-openclaude.py`.
+
+## Flags do `menu-reversa-openclaude.py`
+
+| Flag | Descrição |
+|---|---|
+| `--yes` / `-y` | Não interativo: responde "sim" a todas as confirmações |
+| `--dry-run` | Mostra o que seria feito, sem alterar arquivos |
+| `--copy` | Copia os skills em vez de criar symlinks (Windows sem privilégio) |
+| `--global` | Instala em `~/.openclaude/skills` (escopo de usuário) |
+| `--skills-root DIR` | Raiz dos skills do Reversa (padrão: `.agents/skills`) |
+| `--oc-skills-dir DIR` | Destino no OpenClaude (padrão: `.openclaude/skills`) |
 
 ## Variantes
 
 ### Skills globais (qualquer projeto)
-Para ter `/reversa*` em todos os projetos, crie os symlinks em `~/.openclaude/skills/`
-apontando para uma cópia do Reversa central (ex.: `~/reversa/.agents/skills/<name>`).
-Mude `OC_SKILLS="$HOME/.openclaude/skills"` e ajuste o `target` para o caminho
-absoluto da fonte.
 
-### Fallback sem symlink (Windows sem suporte a symlinks)
-Use **cópia recursiva** em vez de link. Substitua o `ln -s "$target" "$link"` por:
+Use `--global` para criar os links em `~/.openclaude/skills`, apontando (por caminho absoluto) para a cópia central do Reversa:
 
 ```bash
-cp -a "$src" "$link"
+python3 menu-reversa-openclaude.py install --yes --global
 ```
 
-A desvantagem é que `npx reversa update` não reflete automaticamente — será
-necessário rodar o script de sync para recopiar.
+### Fallback sem symlink (Windows sem suporte a symlinks)
+
+Use `--copy`: copia cada skill em vez de linkar. A desvantagem é que `npx reversa update` não se reflete automaticamente — rode `sync` para recopiar.
+
+```bash
+python3 menu-reversa-openclaude.py install --yes --copy
+```
+
+## O que este repositório faz de diferente
+
+- Cobre **`reversa-*`** (e o skill `reversa` sem sufixo, se existir). Skills sem esse prefixo (ex.: `impeccable`) são ignoradas.
+- Cria **symlinks relativos determinísticos** (`../../.agents/skills/<name>`) no escopo do projeto, ou **absolutos** no escopo global.
+- Faz **backup** da pasta `.openclaude/skills` (`.openclaude/skills.bak.<timestamp>`) antes de mexer, quando já há conteúdo.
+- Pede confirmação antes de sobrescrever/criar/remover; em modo `--yes` age sem intervenção.
+- Não cria `opencode.json`, `opencode.jsonc`, `settings.json` nem qualquer config do OpenClaude. Só cria links/cópias em `.openclaude/skills/`.
+- Não modifica os `SKILL.md` originais do Reversa; no modo symlink, `npx reversa update` reflete automaticamente.
+- Detecta **órfãos** (links cuja fonte sumiu) e remove com confirmação.
+
+## Matriz de compatibilidade
+
+| Plataforma | Wrapper | Requisitos | Symlink |
+|---|---|---|---|
+| Ubuntu / Debian / Fedora / Mint | `bin/*.sh` | bash, python3 | Nativo |
+| macOS | `bin/*.sh` | python3 | Nativo |
+| Windows 10/11 | `bin/*.ps1` | Python 3 | Requer Developer Mode/admin; senão `--copy` |
+
+## Solução de problemas
+
+### Windows: "symlink privilege not held" / OSError ao criar link
+
+Sem *Developer Mode* nem admin, o Windows não permite symlinks. Use `--copy`:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File C:\caminho\menu-reversa-openclaude\bin\install.ps1 --yes --copy
+```
+
+### Os comandos `/reversa*` não aparecem no OpenClaude
+
+- Confirme que existem links/cópias em `.openclaude/skills/`.
+- Reinicie o OpenClaude no projeto.
+- Verifique se o `SKILL.md` original existe em `.agents/skills/reversa*/`.
+
+### `ERRO: diretório '.agents/skills' não encontrado`
+
+Você não está na raiz do projeto onde o Reversa foi instalado. Rode `npx reversa install` e execute o wrapper nessa pasta.
+
+### `npx reversa update` adicionou skills mas os comandos não mudaram
+
+Rode o `sync`. No modo `--copy`, é obrigatório para refletir novas versões.
 
 ## Notas e segurança
 
-- **Não** cria `opencode.json`, `opencode.jsonc`, `settings.json` nem qualquer
-  config do OpenClaude. Só cria symlinks em `.openclaude/skills/`.
-- Cria backup timestampado antes de sobrescrever qualquer symlink pré-existente.
+- **Não** cria configuração do OpenClaude; apenas links/cópias em `.openclaude/skills/`.
+- Cria backup timestampado antes de sobrescrever a pasta `.openclaude/skills`.
 - Pede confirmação explícita antes de sobrescrever/criar/remover.
-- Não modifica os `SKILL.md` originais do Reversa; o symlink aponta para o mesmo
-  arquivo, então `npx reversa update` reflete automaticamente.
-- Não empacota nada como plugin Anthropic (`.claude-plugin/`), pois seria overkill
-  para skills já residentes na árvore do projeto.
-- Scripts em bash. O agente adapta para PowerShell/zsh/Git Bash conforme o SO.
+- Não empacota nada como plugin Anthropic (`.claude-plugin/`).
 
 ## Compatibilidade
 
-- OpenClaude `@gitlawb/openclaude@>=0.26.0` (mecanismo verificado: `findSkillMarkdownFiles`
-  segue symlinks; `user-invocable` default `true`).
-- Reversa instalado em `.agents/skills/reversa*` (qualquer versão com frontmatter
-  `name`+`description`).
+- OpenClaude `@gitlawb/openclaude@>=0.26.0` (mecanismo verificado: `findSkillMarkdownFiles` segue symlinks; `user-invocable` default `true`).
+- Reversa instalado em `.agents/skills/reversa*` (qualquer versão com frontmatter `name`+`description`).
+
+## Legado (script shell, v0)
+
+A versão anterior baseada em script shell embutido no README continua disponível no histórico:
+
+- README histórico: <https://github.com/JosehRoberto/menu-reversa-openclaude/blob/bb111ba/README.md>
+- Prompt legado: `Execute o procedimento descrito em https://github.com/JosehRoberto/menu-reversa-openclaude/blob/bb111ba/README.md ...`
+
+O fluxo legado exige Git Bash ou WSL no Windows e não é determinístico entre sistemas; prefira as opções A ou B acima.
 
 ## Licença
 
